@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.zack.camera" >
+
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="true" />
+
+    <application>
+
+        <provider
+            android:exported="false"
+            android:authorities="com.zack.camera.InitProvider"
+            android:name="com.zack.camera.InitProvider"/>
+
+    </application>
+
+</manifest>
