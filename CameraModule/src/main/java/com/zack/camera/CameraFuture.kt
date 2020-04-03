@@ -25,7 +25,7 @@ class CameraFuture<T> : Future<T>{
 
     override fun get(): T? = cameraAQS.get()
 
-    override fun get(timeout: Long, unit: TimeUnit): T? = cameraAQS[unit.toNanos(timeout)]
+    override fun get(timeout: Long, unit: TimeUnit): T? = cameraAQS.get(unit.toNanos(timeout))
 
     override fun cancel(mayInterruptIfRunning: Boolean): Boolean = cameraAQS.cancel(mayInterruptIfRunning)
 
@@ -51,8 +51,9 @@ private class CameraAQS<T> : AbstractQueuedSynchronizer() {
      * 重置状态
      */
     fun resetState(){
-        tryReleaseShared(RUNNING)
+        releaseShared(RUNNING)
         value = null
+        exception = null
     }
 
     /**
@@ -87,7 +88,7 @@ private class CameraAQS<T> : AbstractQueuedSynchronizer() {
     /**
      * 中断等待时间返回
      */
-    operator fun get(nanos: Long): T? {
+    fun get(nanos: Long): T? {
         if (!tryAcquireSharedNanos(-1, nanos)) {
             throw TimeoutException("Timeout waiting for task.")
         }
@@ -98,8 +99,7 @@ private class CameraAQS<T> : AbstractQueuedSynchronizer() {
      * 中断线程等待值返回
      */
     fun get(): T? {
-        // Acquire the shared lock allowing interruption.
-        acquireSharedInterruptibly(-1)
+        acquireShared(-1)
         return getValue()
     }
 
@@ -152,10 +152,7 @@ private class CameraAQS<T> : AbstractQueuedSynchronizer() {
     private fun complete(v: T?, t: Throwable?, finalState: Int): Boolean {
         val doCompletion = compareAndSetState(RUNNING, COMPLETING)
         if (doCompletion) {
-            // If this thread successfully transitioned to COMPLETING, set the value
-            // and exception and then release to the final state.
             this.value = v
-            // Don't actually construct a CancellationException until necessary.
             this.exception = if (finalState and (CANCELLED or INTERRUPTED) != 0) {
                 CancellationException("Future.cancel() was called.")
             } else {
@@ -163,8 +160,6 @@ private class CameraAQS<T> : AbstractQueuedSynchronizer() {
             }
             releaseShared(finalState)
         } else if (state == COMPLETING) {
-            // If some other thread is currently completing the future, block until
-            // they are done so we can guarantee completion.
             acquireShared(-1)
         }
         return doCompletion
